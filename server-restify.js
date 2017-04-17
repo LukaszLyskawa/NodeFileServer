@@ -10,11 +10,10 @@ const SERVER_IP = "dev.lyskawa.pl";
 const SERVER_PORT = 3000;
 const SERVER_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
 const UPLOAD_PATH = "uploads";
-const UPLOAD_DIR = `${__dirname}\\{$UPLOAD_PATH}`;
 
 const server = restify.createServer();
 
-const storage = multer.diskStorage({
+const upload = multer({storage: multer.diskStorage({
 	destination: function(req, file, cb){
 		cb(null, `${UPLOAD_PATH}/`);
 	},
@@ -22,17 +21,11 @@ const storage = multer.diskStorage({
 		var filename = path.parse(file.originalname);
 		cb(null, filename.name + '-' + Date.now() + filename.ext);
 	}
+})
 });
-const upload = multer({storage: storage});
-//FAKE DATA
-var list=[{id: 0, name:"feels-1492362580289.png", download: "/uploads/feels-1492362580289.png", version:"3.1.1",dateAdded:"16.04.2017 19:43"}];
-//*************
 
-
-//BEHAVIOUR
-
+//LIST FILES
 server.get('/file',function(req,res){
-  //LIST FILES
   var response=[];
   fs.readdir(UPLOAD_PATH,function(err,items){
   	for(var i=0,size=items.length;i<size;i++){
@@ -43,19 +36,27 @@ server.get('/file',function(req,res){
   });
 });
 
+//GET FILE[ID]
+server.get('/file/:id',function(req,res){
+	var id = req.params.id;
+	fs.readdir(UPLOAD_PATH,function(err,items){
+		var stats = fs.statSync(`${UPLOAD_PATH}\\${items[id]}`);
+		res.json({id: id, name: items[id], download: `${SERVER_URL}/${UPLOAD_PATH}/${items[id]}`, dateAdded: new Date(stats.birthtime).toUTCString(), sizeB: stats.size});
+	});
+});
 
-  server.get('/file/:id',function(req,res){
-  	res.json(list[req.params.id]);
-  });
+//UPLOAD IMAGE
+server.post('/file', upload.single('img'), function (req, res, next) {
+	res.end(req.file.filename);
+});
 
-  server.post('/file', upload.single('img'), function (req, res, next) {
-  	res.end(req.file.filename);
-  });
+//DOWNLOAD IMAGE
+server.get(/\/uploads\/?.*/, restify.serveStatic({
+	directory: __dirname
+}));
 
-  server.get(/\/uploads\/?.*/, restify.serveStatic({
-  	directory: __dirname
-  }));
 
-  server.listen(SERVER_PORT,function(){
-  	console.log('%s listening at %s',server.name,SERVER_URL) 
-  });
+
+server.listen(SERVER_PORT,function(){
+	console.log('%s listening at %s',server.name,SERVER_URL) 
+});
